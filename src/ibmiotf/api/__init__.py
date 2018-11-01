@@ -102,6 +102,7 @@ class ApiClient():
     oneDeviceTypeLogicalInterfaceUrl = "https://%s/api/v0002/draft/device/types/%s/logicalinterfaces/%s"
 
     # Rules
+    allRulesUrl = "https://%s/api/v0002%s/rules"
     allRulesForLogicalInterfaceUrl = "https://%s/api/v0002%s/logicalinterfaces/%s/rules"
     oneRuleForLogicalInterfaceUrl  = "https://%s/api/v0002%s/logicalinterfaces/%s/rules/%s"
 
@@ -2128,6 +2129,66 @@ class ApiClient():
         else:
             raise ibmiotf.APIException(resp.status_code, "HTTP error getting a logical interface", resp)
         return resp.json()
+    
+    
+    def getAllRules(self, draft=False, nameFilter=None, logicalInterfaceId=None, bookmark=None, limit=None):
+        """
+        Gets all the rules for the orgs
+        Parameter:
+            - draft (boolean) 
+            - nameFilter (String)
+            - logicalInterfaceId (String)
+            - bookmark (String)
+            - limit (int, default 25)
+        Throws APIException on failure.
+        """
+        
+        requesturl = ""
+        
+        if draft:
+            requesturl = ApiClient.allRulesUrl % (self.host, "/draft")
+        else:
+            requesturl = ApiClient.allRulesUrl % (self.host, "")
+            
+        
+        if nameFilter or logicalInterfaceId or bookmark or limit:
+            requesturl += "?"
+            isQueryParamAdded = False
+            
+            if nameFilter:
+                requesturl += "name=%s" % nameFilter
+                isQueryParamAdded = True
+            
+            if logicalInterfaceId:
+                if isQueryParamAdded:
+                    requesturl += "&"
+                requesturl += "logicalInterfaceId=%s" % logicalInterfaceId
+                isQueryParamAdded = True
+            
+            if bookmark:
+                if isQueryParamAdded:
+                    requesturl += "&"
+                requesturl += "_bookmark=%s" % bookmark
+                isQueryParamAdded = True
+                
+            if limit:
+                if isQueryParamAdded:
+                    requesturl += "&"
+                requesturl += "_limit=%s" % limit
+            
+            
+        
+        resp = requests.get(requesturl, auth=self.credentials, verify=self.verify)
+        
+        if resp.status_code == 200:
+            self.logger.debug("All rules retrieved")
+        else:
+            raise ibmiotf.APIException(resp.status_code, "HTTP error getting all rules", resp)
+        
+        return resp.json()
+
+            
+        
 
     def getRulesForLogicalInterface(self, logicalInterfaceId, draft=False):
         """
@@ -2168,23 +2229,32 @@ class ApiClient():
             raise ibmiotf.APIException(resp.status_code, "HTTP error getting logical interface rule", resp)
         return resp.json()
 
-    def addRuleToLogicalInterface(self, logicalInterfaceId, name, condition, description=None, alias=None):
+    def addRuleToLogicalInterface(self, logicalInterfaceId, name, condition, notificationStrategyObject=None, description=None):
         """
         Adds a rule to a logical interface.
         Parameters: 
           - logicalInterfaceId (string)
           - name (string)
           - condition (string)
+          - notification strategy object (json, optional, default: {"when": "every-time"})
           - (description (string, optional)
         Returns: rule id (string), response (object).
         Throws APIException on failure.
         """
         req = ApiClient.allRulesForLogicalInterfaceUrl % (self.host, "/draft", logicalInterfaceId)
         body = {"name" : name, "condition" : condition}
+        if notificationStrategyObject:
+            body["notificationStrategy"] = notificationStrategyObject
         if description:
           body["description"] = description
+          
+        try:
+            bodyJson = json.dumps(body)
+        except Exception as exc:
+            raise ibmiotf.APIException(-1, "Exception formatting the body to JSON", exc)
+        
         resp = requests.post(req, auth=self.credentials, headers={"Content-Type":"application/json"},
-                            data=json.dumps(body), verify=self.verify)
+                            data=bodyJson, verify=self.verify)
         if resp.status_code == 201:
             self.logger.debug("Logical interface rule created")
         else:
@@ -3063,7 +3133,6 @@ class ApiClient():
             bodyJson = json.dumps(serviceBody)
         except Exception as exc:
             raise ibmiotf.APIException(-1, "Exception formatting the body to JSON", exc)
-        print("bodyJson: %s" % bodyJson)
         
         resp = requests.put(serviceReq, auth=self.credentials, headers={"Content-Type":"application/json"}, data=bodyJson,
                verify=self.verify)
