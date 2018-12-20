@@ -15,6 +15,7 @@ import argparse
 
 try:
 	import ibmiotf.device
+	from ibmiotf.device.client import DeviceClient
 except ImportError:
 	# This part is only required to run the sample from within the samples
 	# directory when the module itself is not installed.
@@ -26,6 +27,7 @@ except ImportError:
 	if cmd_subfolder not in sys.path:
 		sys.path.insert(0, cmd_subfolder)
 	import ibmiotf.device
+	import ibmiotf.device.client
 
 def commandProcessor(cmd):
 	print("Command received: %s" % cmd.data)
@@ -57,7 +59,7 @@ try:
 		deviceOptions = ibmiotf.device.ParseConfigFile(args.cfg)
 	else:
 		deviceOptions = {"org": args.organization, "type": args.devicetype, "id": args.deviceid, "auth-method": authMethod, "auth-token": args.token}
-	deviceCli = ibmiotf.device.DeviceClient(deviceOptions)
+	deviceCli = ibmiotf.device.client.DeviceClient(deviceOptions)
 	deviceCli.commandCallback = commandProcessor
 except Exception as e:
 	print("Caught exception connecting device: %s" % str(e))
